@@ -1,0 +1,239 @@
+# Mutagent Agent Specification (agentspec.yaml)
+# PromptShield AI v2.0.0 — Multi-Agent AI Firewall Specification
+
+version: "2.0.0"
+agent:
+  name: "PromptShield Mutagent Multi-Agent Security Engine"
+  id: "promptshield-mutagent"
+  version: "2.0.0"
+  purpose: "Real-time enterprise AI Firewall intercepting prompts and attached files sent to ChatGPT, Claude, and Gemini to prevent data leakage, credential exposure, prompt injection, and compliance violations."
+  description: "A 5-stage Multi-Agent security orchestration pipeline that evaluates browser prompts and file attachments, executes parallel threat detectors with fault isolation, aggregates weighted risk scores, and enforces policy decisions (ALLOW, WARN, REDACT, BLOCK) backed by full MySQL investigation traces."
+
+system_goal:
+  description: "Evaluate user prompts and attached files within ~100ms, enforcing organization policies and returning deterministic security verdicts accompanied by explainable evidence and complete DAG investigation traces."
+  target_latency_ms: 200
+  fault_tolerance: "Per-agent 2.0s timeout with isolated exception handling."
+
+responsibilities:
+  - "Intercept prompts and file attachments on ChatGPT, Claude, and Gemini before submission."
+  - "Extract user identity, session context, and file metadata."
+  - "Perform file identity checks and extract text from PDF, Word, Excel, CSV, source code, config files, logs, and OCR images."
+  - "Concurrently analyze text using Presidio PII, detect-secrets, prompt injection detectors, and company keyword/policy matchers."
+  - "Aggregate multi-analyzer risk findings using admin-configured risk weight multipliers."
+  - "Evaluate admin policy rules in ascending priority order to issue deterministic verdicts (ALLOW, WARN, REDACT, BLOCK)."
+  - "Persist full multi-agent investigation traces (investigations, agent_executions, timeline_events) into MySQL."
+
+input_types:
+  prompt:
+    type: "string"
+    required: true
+    description: "Raw prompt text typed by the employee into the AI web interface."
+  site:
+    type: "string"
+    required: true
+    enum: ["ChatGPT", "Claude", "Gemini"]
+    description: "Target AI platform where the prompt is being submitted."
+  user:
+    type: "object"
+    required: true
+    properties:
+      id: { type: "string", description: "User UUID" }
+      email: { type: "string", description: "Employee email address" }
+      full_name: { type: "string", description: "Employee full name" }
+      department: { type: "string", description: "Employee department" }
+      role: { type: "string", enum: ["admin", "security_analyst", "employee"] }
+  files:
+    type: "array"
+    required: false
+    items:
+      type: "object"
+      properties:
+        filename: { type: "string" }
+        content_base64: { type: "string" }
+        mime_type: { type: "string" }
+        size_bytes: { type: "integer" }
+  org_settings:
+    type: "object"
+    required: true
+    properties:
+      organization_name: { type: "string" }
+      risk_threshold: { type: "integer", default: 70 }
+      allowed_file_types: { type: "array", items: { type: "string" } }
+      risk_weights: { type: "object", additionalProperties: { type: "number" } }
+      enabled_analyzers: { type: "array", items: { type: "string" } }
+  policies:
+    type: "array"
+    required: true
+    items:
+      type: "object"
+      properties:
+        id: { type: "string" }
+        name: { type: "string" }
+        priority: { type: "integer" }
+        detection_type: { type: "string" }
+        action: { type: "string", enum: ["ALLOW", "WARN", "REDACT", "BLOCK"] }
+        enabled: { type: "boolean" }
+
+output_types:
+  decision:
+    type: "object"
+    properties:
+      action: { type: "string", enum: ["ALLOW", "WARN", "REDACT", "BLOCK"] }
+      score: { type: "integer", minimum: 0, maximum: 100 }
+      risk: { type: "string", enum: ["NONE", "LOW", "MEDIUM", "HIGH", "CRITICAL"] }
+      reason: { type: "string" }
+      triggered_policy: { type: "string", nullable: true }
+  sanitized_prompt:
+    type: "string"
+    description: "Original prompt with sensitive entities replaced by placeholders if action is REDACT."
+  file_results:
+    type: "array"
+    items:
+      type: "object"
+      properties:
+        filename: { type: "string" }
+        risk: { type: "string" }
+        score: { type: "integer" }
+        action: { type: "string" }
+        reason: { type: "string" }
+        findings: { type: "array" }
+  investigation_trace:
+    type: "object"
+    properties:
+      id: { type: "string", description: "Scan / Investigation UUID" }
+      user_id: { type: "string" }
+      target_ai: { type: "string" }
+      total_execution_ms: { type: "number" }
+      agent_executions: { type: "array" }
+      timeline: { type: "array" }
+
+available_tools:
+  ContextAnalyzer:
+    stage: 1
+    type: "sequential"
+    description: "Extracts user session identity, prompt length, target AI platform, and file counts."
+  FileIntelAnalyzer:
+    stage: 2
+    type: "sequential"
+    extractors: ["pypdf", "python-docx", "openpyxl", "pytesseract OCR", "PyYAML"]
+    description: "Performs file identity risk scoring (.env, id_rsa) and extracts text content from supported file types."
+  PiiAnalyzer:
+    stage: 3
+    type: "parallel"
+    detectors: ["Microsoft Presidio Analyzer/Anonymizer", "spaCy NER (en_core_web_sm)", "Regex Entity Matcher"]
+    description: "Detects emails, phone numbers, credit cards, SSNs, and personal names."
+  SecretsAnalyzer:
+    stage: 3
+    type: "parallel"
+    detectors: ["detect-secrets (24 pattern-based plugins)"]
+    description: "Detects live credentials including AWS keys, GitHub tokens, JWTs, OpenAI keys, and private keys."
+  InjectionAnalyzer:
+    stage: 3
+    type: "parallel"
+    detectors: ["Jailbreak Pattern Engine", "System Prompt Override Detector"]
+    description: "Identifies prompt injection attacks, safety filter bypass attempts, and roleplay exploits."
+  ComplianceAnalyzer:
+    stage: 3
+    type: "parallel"
+    detectors: ["Company Keyword Matcher", "Org Policy Evaluator"]
+    description: "Matches sensitive internal codenames and evaluates organization policy rules."
+  RiskFusionAnalyzer:
+    stage: 4
+    type: "sequential"
+    description: "Aggregates findings from Stage 3 parallel analyzers using org-configured risk weights."
+  DecisionAnalyzer:
+    stage: 5
+    type: "sequential"
+    description: "Evaluates policy priority order and risk score bands to produce final enforcement decision."
+
+multi_agent_workflow:
+  architecture: "Directed Acyclic Graph (DAG)"
+  concurrency_engine: "ThreadPoolExecutor"
+  timeout_per_agent_seconds: 2.0
+  stages:
+    stage_1:
+      name: "Context Extraction"
+      analyzers: ["ContextAnalyzer"]
+      execution: "Sequential"
+    stage_2:
+      name: "File Intelligence & Text Extraction"
+      analyzers: ["FileIntelAnalyzer"]
+      execution: "Sequential"
+    stage_3:
+      name: "Parallel Threat Analysis"
+      analyzers: ["PiiAnalyzer", "SecretsAnalyzer", "InjectionAnalyzer", "ComplianceAnalyzer"]
+      execution: "Parallel (Concurrent via ThreadPoolExecutor)"
+    stage_4:
+      name: "Weighted Risk Fusion"
+      analyzers: ["RiskFusionAnalyzer"]
+      execution: "Sequential"
+    stage_5:
+      name: "Policy Decision Gate"
+      analyzers: ["DecisionAnalyzer"]
+      execution: "Sequential"
+
+decision_policy:
+  priority_resolution: "Ascending priority number (lowest integer wins)."
+  fallback_risk_bands:
+    CRITICAL: { min_score: 75, max_score: 100, default_action: "BLOCK" }
+    HIGH:     { min_score: 50, max_score: 74,  default_action: "REDACT" }
+    MEDIUM:   { min_score: 25, max_score: 49,  default_action: "WARN" }
+    LOW:      { min_score: 1,  max_score: 24,  default_action: "ALLOW" }
+    NONE:     { min_score: 0,  max_score: 0,   default_action: "ALLOW" }
+
+constraints:
+  - "Raw file contents and raw prompt texts are never stored in MySQL audit logs (metadata and redacted previews only)."
+  - "Maximum 5 files per scan payload (~10MB limit)."
+  - "detect-secrets entropy plugins are disabled to eliminate false positives on standard text."
+  - "All backend operations fail open safely on database/network timeout so user workflow is not blocked."
+
+security_guarantees:
+  - "Client-side interception guarantees prompts are scanned before web requests leave for AI servers."
+  - "Password hashing using bcrypt; session management via HS256 JWT tokens."
+  - "Public account registration defaults strictly to standard employee role (no self-admin escalation)."
+
+explainability_guarantees:
+  - "Every WARN or BLOCK verdict returns a structured Explainable AI payload."
+  - "Payload includes exact match previews, confidence ratings, character offsets, detector labels, triggered policy name, and human-readable reasoning."
+  - "Investigation traces persist full timeline event logs with millisecond timestamps per agent."
+
+evaluation_criteria:
+  - metric: "Scan Latency"
+    target: "< 200ms average execution time"
+  - metric: "Fault Isolation"
+    target: "100% pipeline survival under individual agent exceptions"
+  - metric: "Credential Detection Recall"
+    target: "100% detection for AWS keys, GitHub tokens, and RSA private keys"
+
+example_interactions:
+  - scenario: "AWS Access Key Exposure"
+    input_prompt: "Here is my AWS key AKIAIOSFODNN7EXAMPLE and secret wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY for deployment."
+    target_site: "ChatGPT"
+    user: "karan.desai@acme.com"
+    expected_outcome:
+      action: "BLOCK"
+      risk_score: 90
+      severity: "CRITICAL"
+      failing_analyzer: "SecretsAnalyzer"
+      reason: "Blocked: Prompt contains live credentials (AWS Access Key)."
+
+  - scenario: "PII Exposure (Email & Phone Number)"
+    input_prompt: "Draft an email to priya.sharma@acme.com or call +1-555-019-2834 regarding Project Phoenix."
+    target_site: "Claude"
+    user: "neha.gupta@acme.com"
+    expected_outcome:
+      action: "WARN"
+      risk_score: 40
+      severity: "MEDIUM"
+      failing_analyzer: "PiiAnalyzer"
+      sanitized_prompt: "Draft an email to [REDACTED_EMAIL] or call [REDACTED_PHONE] regarding Project Phoenix."
+
+  - scenario: "Clean React Application Query"
+    input_prompt: "What are the best practices for setting up a modern React 19 application with TypeScript?"
+    target_site: "ChatGPT"
+    user: "dev.patel@acme.com"
+    expected_outcome:
+      action: "ALLOW"
+      risk_score: 0
+      severity: "NONE"
+      reason: "No security issues or policy violations detected."

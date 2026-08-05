@@ -1,0 +1,238 @@
+{
+  "suite": "PromptShield AI Mutagent Security Evaluation Suite",
+  "version": "2.0.0",
+  "total_test_cases": 25,
+  "summary": {
+    "expected_block": 15,
+    "expected_warn": 6,
+    "expected_redact": 1,
+    "expected_allow": 3
+  },
+  "results": [
+    {
+      "id": "TC-001",
+      "expected_decision": "BLOCK",
+      "expected_score": 90,
+      "score_range": [85, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["SecretsAnalyzer"],
+      "explanation": "Blocked: Prompt contains live credentials (AWS Access Key)."
+    },
+    {
+      "id": "TC-002",
+      "expected_decision": "BLOCK",
+      "expected_score": 90,
+      "score_range": [85, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["SecretsAnalyzer"],
+      "explanation": "Blocked: Prompt contains live credentials (GitHub Personal Access Token)."
+    },
+    {
+      "id": "TC-003",
+      "expected_decision": "BLOCK",
+      "expected_score": 85,
+      "score_range": [75, 95],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["SecretsAnalyzer"],
+      "explanation": "Blocked: Prompt contains sensitive JWT session token."
+    },
+    {
+      "id": "TC-004",
+      "expected_decision": "BLOCK",
+      "expected_score": 90,
+      "score_range": [85, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["SecretsAnalyzer"],
+      "explanation": "Blocked: Prompt contains live OpenAI API key."
+    },
+    {
+      "id": "TC-005",
+      "expected_decision": "BLOCK",
+      "expected_score": 90,
+      "score_range": [80, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["SecretsAnalyzer"],
+      "explanation": "Blocked: Prompt contains Azure Storage Access Key."
+    },
+    {
+      "id": "TC-006",
+      "expected_decision": "BLOCK",
+      "expected_score": 85,
+      "score_range": [80, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["SecretsAnalyzer"],
+      "explanation": "Blocked: Prompt contains Google API Key."
+    },
+    {
+      "id": "TC-007",
+      "expected_decision": "REDACT",
+      "expected_score": 55,
+      "score_range": [40, 70],
+      "severity": "HIGH",
+      "triggered_analyzers": ["PiiAnalyzer"],
+      "explanation": "Redacted: Personal Identifiable Information (PII) detected."
+    },
+    {
+      "id": "TC-008",
+      "expected_decision": "WARN",
+      "expected_score": 40,
+      "score_range": [35, 65],
+      "severity": "MEDIUM",
+      "triggered_analyzers": ["PiiAnalyzer"],
+      "explanation": "Warning: Prompt contains employee PII."
+    },
+    {
+      "id": "TC-009",
+      "expected_decision": "BLOCK",
+      "expected_score": 90,
+      "score_range": [80, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["PiiAnalyzer"],
+      "explanation": "Blocked: Prompt contains PCI payment card number."
+    },
+    {
+      "id": "TC-010",
+      "expected_decision": "BLOCK",
+      "expected_score": 90,
+      "score_range": [80, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["PiiAnalyzer"],
+      "explanation": "Blocked: Prompt contains Social Security Number."
+    },
+    {
+      "id": "TC-011",
+      "expected_decision": "WARN",
+      "expected_score": 45,
+      "score_range": [50, 75],
+      "severity": "MEDIUM",
+      "triggered_analyzers": ["PiiAnalyzer"],
+      "explanation": "Warning: Passport PII identifier detected."
+    },
+    {
+      "id": "TC-012",
+      "expected_decision": "BLOCK",
+      "expected_score": 85,
+      "score_range": [75, 95],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["PiiAnalyzer"],
+      "explanation": "Blocked: Prompt contains national ID (Aadhaar)."
+    },
+    {
+      "id": "TC-013",
+      "expected_decision": "WARN",
+      "expected_score": 40,
+      "score_range": [50, 75],
+      "severity": "MEDIUM",
+      "triggered_analyzers": ["PiiAnalyzer"],
+      "explanation": "Warning: Tax identifier (PAN) detected."
+    },
+    {
+      "id": "TC-014",
+      "expected_decision": "BLOCK",
+      "expected_score": 80,
+      "score_range": [65, 90],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["FileIntelAnalyzer", "PiiAnalyzer"],
+      "explanation": "Blocked: Attached file contains restricted financial/payroll PII."
+    },
+    {
+      "id": "TC-015",
+      "expected_decision": "WARN",
+      "expected_score": 40,
+      "score_range": [60, 85],
+      "severity": "MEDIUM",
+      "triggered_analyzers": ["ComplianceAnalyzer"],
+      "explanation": "Warning: Contains confidential company keyword (Project Phoenix)."
+    },
+    {
+      "id": "TC-016",
+      "expected_decision": "BLOCK",
+      "expected_score": 95,
+      "score_range": [85, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["FileIntelAnalyzer"],
+      "explanation": "Blocked: Disallowed secrets file type (.env)."
+    },
+    {
+      "id": "TC-017",
+      "expected_decision": "BLOCK",
+      "expected_score": 95,
+      "score_range": [90, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["FileIntelAnalyzer"],
+      "explanation": "Blocked: Disallowed identity key file (id_rsa)."
+    },
+    {
+      "id": "TC-018",
+      "expected_decision": "WARN",
+      "expected_score": 35,
+      "score_range": [20, 45],
+      "severity": "MEDIUM",
+      "triggered_analyzers": ["ComplianceAnalyzer"],
+      "explanation": "Warning: Unsanitized SQL query pattern in source code."
+    },
+    {
+      "id": "TC-019",
+      "expected_decision": "BLOCK",
+      "expected_score": 90,
+      "score_range": [75, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["InjectionAnalyzer"],
+      "explanation": "Blocked: Prompt injection attempt detected."
+    },
+    {
+      "id": "TC-020",
+      "expected_decision": "BLOCK",
+      "expected_score": 90,
+      "score_range": [80, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["InjectionAnalyzer"],
+      "explanation": "Blocked: Jailbreak persona prompt detected."
+    },
+    {
+      "id": "TC-021",
+      "expected_decision": "BLOCK",
+      "expected_score": 85,
+      "score_range": [75, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["InjectionAnalyzer"],
+      "explanation": "Blocked: System override instruction detected."
+    },
+    {
+      "id": "TC-022",
+      "expected_decision": "ALLOW",
+      "expected_score": 0,
+      "score_range": [0, 0],
+      "severity": "NONE",
+      "triggered_analyzers": ["ContextAnalyzer"],
+      "explanation": "Clean prompt. No threats or policy violations detected."
+    },
+    {
+      "id": "TC-023",
+      "expected_decision": "ALLOW",
+      "expected_score": 0,
+      "score_range": [0, 0],
+      "severity": "NONE",
+      "triggered_analyzers": ["ContextAnalyzer"],
+      "explanation": "Clean prompt. No threats or policy violations detected."
+    },
+    {
+      "id": "TC-024",
+      "expected_decision": "WARN",
+      "expected_score": 24,
+      "score_range": [15, 35],
+      "severity": "LOW",
+      "triggered_analyzers": ["PiiAnalyzer"],
+      "explanation": "Warning: Work email address present in prompt."
+    },
+    {
+      "id": "TC-025",
+      "expected_decision": "BLOCK",
+      "expected_score": 90,
+      "score_range": [85, 100],
+      "severity": "CRITICAL",
+      "triggered_analyzers": ["SecretsAnalyzer"],
+      "explanation": "Blocked: Hardcoded API key detected in source code snippet."
+    }
+  ]
+}

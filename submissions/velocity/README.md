@@ -175,7 +175,7 @@ npm run build
 In Chrome: Go to `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `browser-extension/dist`.
 
 ---
-
+Where to see the apis present and about them? Visit `http://localhost:8000/docs` to know more
 ## 11. Future Work
 
 - **Multi-Tenant SSO/SAML**: Okta and Azure AD integration for enterprise user directory synchronization.

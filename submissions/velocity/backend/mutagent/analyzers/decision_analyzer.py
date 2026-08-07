@@ -78,6 +78,40 @@ class DecisionAnalyzer(BaseAnalyzer):
             decision = decide(risk_assessment, policy_outcome, context.findings)
             context.decision = decision
 
+            # 3b. Recompute each file's own action/reason now that the Stage 3
+            # content analyzers (Secrets/PII/Injection/Compliance) have added
+            # their [file:<filename>]-tagged findings to context.findings.
+            # FileIntelAnalyzer (Stage 2) could only see identity-risk findings
+            # when it first built these summaries, since content analysis
+            # hadn't run yet - left as-is, a file whose ONLY risk is
+            # content-based (e.g. a plain .txt containing leaked AWS/OpenAI
+            # keys) would incorrectly stay "ALLOW / No detectors ran" forever,
+            # letting it through unblocked despite the top-level prompt
+            # decision being BLOCK. This mirrors the per-file decision logic
+            # in ai/pipeline.py::_scan_one_file exactly (same assess_risk /
+            # evaluate_policies / decide calls), just re-run once content
+            # findings actually exist.
+            if context.file_findings:
+                from ai.policy_engine import evaluate_policies
+                from ai.risk_engine import assess_risk
+
+                updated_file_findings = []
+                for file_summary in context.file_findings:
+                    file_tag = f"[file:{file_summary.filename}]"
+                    file_results = [r for r in context.findings if r.reason.startswith(file_tag)]
+                    if file_results:
+                        file_risk = assess_risk(file_results)
+                        file_policy_outcome = evaluate_policies(file_results, context.policies)
+                        file_decision = decide(file_risk, file_policy_outcome, file_results)
+                        file_summary = file_summary.model_copy(update={
+                            "risk": file_risk.overall_severity.value,
+                            "score": file_risk.overall_score,
+                            "action": file_decision.action.value,
+                            "reason": file_decision.reason,
+                        })
+                    updated_file_findings.append(file_summary)
+                context.file_findings = updated_file_findings
+
             # 4. Redact prompt (only prompt-sourced results, not file-tagged ones)
             prompt_results = [r for r in context.findings if not r.reason.startswith("[file:")]
             if context.prompt.strip():

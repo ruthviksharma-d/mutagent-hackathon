@@ -25,7 +25,7 @@ Legacy AI firewalls and proxy wrappers fail in enterprise environments:
 
 ## 3. Live Demo & Session Recording
 
-[![PromptShield AI Live Product Demo](submissions/velocity/assets/demo_thumbnail.png)](submissions/velocity/assets/demo_recording.webp)
+[![PromptShield AI Live Product Demo](assets/demo_thumbnail.png)](assets/demo_recording.webp)
 
 *Click image above to watch the full WebP interactive session recording of PromptShield AI v2.0.*
 
@@ -104,15 +104,15 @@ The Security Investigations Console (`/investigations` & `/investigations/:id`) 
 
 | Console View | High-Resolution Capture from Live Application |
 |---|---|
-| **Security Investigations Table** | ![Security Investigations List](submissions/velocity/assets/investigations_table.png) |
-| **Interactive SVG Flow Graph (DAG)** | ![Multi-Agent DAG & Risk Gauge](submissions/velocity/assets/investigation_detail_graph.png) |
-| **Evidence Panel & Findings** | ![Evidence Panel](submissions/velocity/assets/investigation_evidence.png) |
-| **Millisecond Execution Timeline** | ![Timeline Log](submissions/velocity/assets/investigation_timeline.png) |
-| **Prompt Logs Table** | ![Prompt Logs Table](submissions/velocity/assets/prompt_logs.png) |
-| **Policy Authoring & Modal** | ![Policy Authoring](submissions/velocity/assets/policy_modal.png) |
-| **Employee Directory** | ![Employee Directory](submissions/velocity/assets/employees.png) |
-| **Analytics Trend Charts** | ![Analytics Charts](submissions/velocity/assets/analytics.png) |
-| **Settings & Risk Thresholds** | ![Settings Page](submissions/velocity/assets/settings.png) |
+| **Security Investigations Table** | ![Security Investigations List](assets/investigations_table.png) |
+| **Interactive SVG Flow Graph (DAG)** | ![Multi-Agent DAG & Risk Gauge](assets/investigation_detail_graph.png) |
+| **Evidence Panel & Findings** | ![Evidence Panel](assets/investigation_evidence.png) |
+| **Millisecond Execution Timeline** | ![Timeline Log](assets/investigation_timeline.png) |
+| **Prompt Logs Table** | ![Prompt Logs Table](assets/prompt_logs.png) |
+| **Policy Authoring & Modal** | ![Policy Authoring](assets/policy_modal.png) |
+| **Employee Directory** | ![Employee Directory](assets/employees.png) |
+| **Analytics Trend Charts** | ![Analytics Charts](assets/analytics.png) |
+| **Settings & Risk Thresholds** | ![Settings Page](assets/settings.png) |
 
 ---
 
@@ -174,9 +174,38 @@ npm run build
 ```
 In Chrome: Go to `chrome://extensions`, enable **Developer mode**, click **Load unpacked**, and select `browser-extension/dist`.
 
+### 5. CLI Protection Setup (`psh`)
+PromptShield CLI protects terminal AI usage for **Claude CLI** and **Gemini CLI**:
+
+```bash
+cd cli
+pip install -e .
+```
+
+Run CLI commands:
+```bash
+psh claude "What is the capital of France?"
+psh gemini "Analyze attached code" -f file.py -f config.env
+```
+Decisions (`ALLOW`, `WARN`, `REDACT`, `BLOCK`) are evaluated by the backend engine and automatically logged to the Admin Dashboard under provider `"Claude CLI"` or `"Gemini CLI"`.
+
 ---
-Where to see the apis present and about them? Visit `http://localhost:8000/docs` to know more
-## 11. Future Work
+
+## 11. Manual Verification & Latest Hardening
+
+PromptShield AI v2.0's Browser Extension and CLI wrapper have both been manually verified end-to-end against a live backend + dashboard:
+
+**Browser Extension** — ChatGPT/Claude/Gemini interception, prompt scanning, file scanning, `ALLOW`/`BLOCK` enforcement, and Admin Dashboard logging all confirmed working.
+
+**PromptShield CLI (`psh`)** — installation, Claude CLI and Gemini CLI integration, interactive mode, prompt interception/forwarding, `ALLOW`/`BLOCK` enforcement, file scanning, dashboard logging, and error handling all confirmed working.
+
+**Latest fix — per-file decision recomputation (Stage 5)**: manual file-scan testing surfaced a real bug where an uploaded file's *own* `FileFindingSummary` (the per-file `action`/`risk` the extension and CLI use to gate that specific attachment — see `schemas/scan.py::FileFindingSummary`) was computed by `FileIntelAnalyzer` in Stage 2, **before** the Stage 3 content analyzers (`SecretsAnalyzer`, `PiiAnalyzer`, `InjectionAnalyzer`, `ComplianceAnalyzer`) had run. A file whose *only* risk was content-based — e.g. a plain `.txt` containing leaked AWS/OpenAI keys — stayed permanently stamped `ALLOW` / `"No detectors ran"` in its per-file summary, even though the top-level scan decision correctly came back `BLOCK`. Identity-based file risk (a file literally named `.env`, `id_rsa`, etc.) was never affected, since that's computed at Stage 2 and doesn't depend on content analysis.
+
+Fixed in `backend/mutagent/analyzers/decision_analyzer.py`: after all content analyzers have tagged their `[file:<filename>]` findings, Stage 5 (`DecisionAnalyzer`) now recomputes each file's `risk`/`score`/`action`/`reason` from those findings using the same `assess_risk` / `evaluate_policies` / `decide` calls the rest of the pipeline already uses — no duplicated logic. Verified against a reproduction of the exact bug (AWS + OpenAI keys in an uploaded `.txt` file: per-file summary now correctly reports `BLOCK` / `CRITICAL` instead of `ALLOW` / `NONE`), with a clean control file confirmed to still report `ALLOW`. Full backend test suite (49 non-DB tests) passes with no regressions.
+
+---
+
+## 12. Future Work
 
 - **Multi-Tenant SSO/SAML**: Okta and Azure AD integration for enterprise user directory synchronization.
 - **WebSocket Streaming**: Real-time streaming of live multi-agent investigation execution steps.

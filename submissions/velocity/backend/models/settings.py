@@ -37,7 +37,7 @@ class OrgSettings(Base):
         JSON,
         default=lambda: [
             # Documents
-            "pdf", "docx", "txt",
+            "pdf", "docx", "txt", "md",
             # Source code
             "java", "py", "js", "jsx", "ts", "tsx", "cpp", "cc", "cxx", "h", "hpp", "c", "cs",
             "go", "rs", "php", "html", "htm", "css", "sql",

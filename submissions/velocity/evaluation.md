@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-The **PromptShield AI Security Evaluation Suite** contains 25 representative enterprise security scenarios designed to validate the **Mutagent Multi-Agent Detection Pipeline**.
+The **PromptShield AI Security Evaluation Suite** contains 25 representative enterprise security scenarios designed to validate the **Mutagent Multi-Agent Detection Pipeline**. All 25 scenarios were exercised through the Browser Extension's `POST /api/scan` path; since the PromptShield CLI's `POST /api/cli/scan` endpoint calls the identical `InvestigationEngine` with no separate detection logic (see `backend/routers/cli.py`), these results characterize the shared pipeline itself and apply equally to CLI-originated scans. CLI-specific behavior (installation, provider launching, interactive mode, error handling) is verified separately — see `MANUAL_TESTING_GUIDE.md`.
 
 ### Test Suite Distribution
 

@@ -29,32 +29,40 @@ running.
    - [What the popup shows you](#what-the-popup-shows-you)
    - [What happens when you type a prompt or attach a file](#what-happens-when-you-type-a-prompt-or-attach-a-file)
    - [Reading the Explainable AI panel](#reading-the-explainable-ai-panel)
-6. [Common Workflows, Step by Step](#common-workflows-step-by-step)
+6. [Using the PromptShield CLI (`psh`)](#using-the-promptshield-cli-psh)
+   - [Installing psh](#installing-psh)
+   - [One-shot prompts](#one-shot-prompts)
+   - [Interactive mode](#interactive-mode)
+   - [Attaching files](#attaching-files)
+   - [Configuring the backend URL](#configuring-the-backend-url)
+7. [Common Workflows, Step by Step](#common-workflows-step-by-step)
    - [Workflow: onboarding a new employee](#workflow-onboarding-a-new-employee)
    - [Workflow: investigating a multi-agent trace](#workflow-investigating-a-multi-agent-trace)
    - [Workflow: writing your first policy](#workflow-writing-your-first-policy)
    - [Workflow: adding a company keyword](#workflow-adding-a-company-keyword)
    - [Workflow: reviewing weekly risk trends](#workflow-reviewing-weekly-risk-trends)
-7. [Understanding the Four Decisions](#understanding-the-four-decisions)
-8. [Troubleshooting](#troubleshooting)
-9. [Default Credentials Reference](#default-credentials-reference)
+8. [Understanding the Four Decisions](#understanding-the-four-decisions)
+9. [Troubleshooting](#troubleshooting)
+10. [Default Credentials Reference](#default-credentials-reference)
 
 ---
 
 ## What PromptShield AI Is
 
 PromptShield AI is an AI firewall for organizations whose employees use
-ChatGPT, Claude, and Gemini in their day-to-day work. It doesn't ask anyone to
+ChatGPT, Claude, and Gemini — in the browser or from the terminal via Claude
+CLI / Gemini CLI — in their day-to-day work. It doesn't ask anyone to
 stop using those tools or switch to a different one. Instead, it sits quietly
-between the employee and the AI website: every time someone types a prompt or attaches a file and
-hits send, PromptShield inspects it first via the **Mutagent Multi-Agent Engine**, decides whether it's safe, and only
+between the employee and the AI: every time someone types a prompt or attaches a file and
+hits send (or runs `psh claude`/`psh gemini`), PromptShield inspects it first via the **Mutagent Multi-Agent Engine**, decides whether it's safe, and only
 then lets it (or a cleaned-up version of it) reach the AI.
 
-It's made of three parts:
+It's made of four parts:
 
 - **A browser extension** — Manifest V3 extension that sits inside ChatGPT, Claude, and Gemini to intercept prompts and file uploads before submission.
+- **A CLI wrapper (`psh`)** — intercepts prompts and file attachments before they reach the real `claude`/`gemini` CLI binary, using the exact same backend and policy engine as the browser extension.
 - **An admin dashboard** — React console featuring live security analytics, policy editor, and the **Mutagent Security Investigations Console**.
-- **FastAPI Backend & Mutagent Engine** — 5-stage Multi-Agent execution pipeline (`ContextAgent` → `FileIntelAgent` → `PiiAgent`/`SecretsAgent`/`InjectionAgent`/`ComplianceAgent` → `RiskFusionAgent` → `DecisionAgent`).
+- **FastAPI Backend & Mutagent Engine** — 5-stage Multi-Agent execution pipeline (`ContextAgent` → `FileIntelAgent` → `PiiAgent`/`SecretsAgent`/`InjectionAgent`/`ComplianceAgent` → `RiskFusionAgent` → `DecisionAgent`) shared, unmodified, by both the extension and the CLI.
 
 ---
 
@@ -185,6 +193,54 @@ Organization-wide settings:
 
 ---
 
+## Using the PromptShield CLI (`psh`)
+
+`psh` extends the exact same backend, policy engine, and audit logging to terminal AI tools — **Claude CLI** and **Gemini CLI** — for developers and power users who work outside the browser. Every `psh` scan runs through the identical Mutagent pipeline as the extension and shows up on the same Admin Dashboard, under provider `"Claude CLI"` or `"Gemini CLI"`.
+
+### Installing psh
+
+```bash
+cd cli
+pip install -e .
+```
+
+This registers the `psh` command on your `PATH` (Windows: `psh.bat`, Linux/macOS: `./psh` also work without an editable install). See [`cli/README.md`](cli/README.md) for full installation and configuration details.
+
+### One-shot prompts
+
+```bash
+psh claude "What is the capital of France?"
+psh gemini "Summarize this changelog"
+```
+
+`psh` scans the prompt, prints the decision, and — if `ALLOW`/`WARN`(confirmed)/`REDACT` — launches the real `claude`/`gemini` CLI binary with the (possibly sanitized) prompt. A `BLOCK` decision never launches the target CLI at all.
+
+### Interactive mode
+
+Run `psh claude` or `psh gemini` with no prompt argument (or pass `-i`) to start a multi-turn session where every line you type at the `> ` prompt is scanned before it reaches the AI:
+
+```bash
+psh claude
+> hello
+> Card numbers on file: 4111 1111 1111 1111 and 5500 0000 0000 0004
+```
+
+Type `exit`, `quit`, or `:q` to end the session; `Ctrl+C` ends it cleanly with no traceback.
+
+### Attaching files
+
+```bash
+psh gemini "Analyze this document" -f report.pdf -f config.env
+```
+
+Repeat `-f` for multiple files. Each attachment gets its own risk assessment independent of the prompt and every other file (see the [Understanding the Four Decisions](#understanding-the-four-decisions) note on per-file vs. overall decisions below), and every file's finding is visible on the **Prompt Logs** detail page in the dashboard exactly like a browser-uploaded file.
+
+### Configuring the backend URL
+
+By default `psh` talks to `http://localhost:8000`. Override it per-command with `--backend-url`, or set it once via the `PROMPTSHIELD_BACKEND_URL` environment variable or `~/.promptshield/config.json` — see [`cli/README.md`](cli/README.md#configuration) for the full list of options (`PROMPTSHIELD_API_TOKEN`, `PROMPTSHIELD_TIMEOUT`).
+
+---
+
 ## Common Workflows, Step by Step
 
 ### Workflow: investigating a multi-agent trace
@@ -199,12 +255,16 @@ Organization-wide settings:
 
 ## Understanding the Four Decisions
 
-| Decision | Employee Experience | Action Taken |
-|---|---|---|
-| **ALLOW** | Silent — no popup | Sent through unmodified |
-| **WARN** | Modal with Cancel/Continue | Sent only if user clicks Continue |
-| **REDACT** | Textbox updated + Toast notice | Sensitive spans replaced with placeholders |
-| **BLOCK** | Explanatory modal, no proceed option | Blocked outright before reaching AI |
+| Decision | Browser Extension Experience | CLI (`psh`) Experience | Action Taken |
+|---|---|---|---|
+| **ALLOW** | Silent — no popup | `Decision : ALLOW`, no prompt | Sent through unmodified |
+| **WARN** | Modal with Cancel/Continue | `Continue? (y/N)` prompt | Sent only if the employee confirms |
+| **REDACT** | Textbox updated + Toast notice | Sanitized prompt printed and sent | Sensitive spans replaced with placeholders |
+| **BLOCK** | Explanatory modal, no proceed option | Error message, target CLI never launched | Blocked outright before reaching AI |
+
+A decision is driven by a policy match if one exists (evaluated in ascending priority order — the first enabled policy that matches wins), otherwise by the aggregate risk score's severity band (`LOW` → `ALLOW`, `MEDIUM` → `WARN`, `HIGH` → `REDACT`, `CRITICAL` → `BLOCK`).
+
+**Per-file vs. overall decisions**: when files are attached (browser or CLI), each file also gets its *own* independent `action`/`risk` (visible in the Prompt Logs detail view and in the CLI's per-file output), computed only from that file's own findings — separate from the single overall decision that governs the prompt text. This is what lets a multi-file upload hold back just the one risky attachment instead of failing the whole batch, and it means the overall decision and an individual file's decision can legitimately differ (e.g. a bare `.env` upload is flagged `BLOCK`/`CRITICAL` on its own file-identity risk, even when the overall prompt+files decision comes back `REDACT` once every analyzer's score is combined).
 
 ---
 

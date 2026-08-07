@@ -1,6 +1,6 @@
 # Benchmark & Evaluation Results — PromptShield AI v2.0
 
-This document summarizes the empirical evaluation of PromptShield AI across 25 representative enterprise security test cases.
+This document summarizes the empirical evaluation of PromptShield AI across 25 representative enterprise security test cases, run against the shared Mutagent detection pipeline via the Browser Extension's `/api/scan` endpoint. Since the PromptShield CLI's `/api/cli/scan` endpoint invokes the same `InvestigationEngine` with no duplicated detection logic, these numbers characterize both clients equally.
 
 ---
 

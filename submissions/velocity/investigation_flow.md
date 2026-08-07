@@ -1,6 +1,6 @@
 # Investigation Flow & Multi-Agent DAG
 
-The **Security Investigations Console** renders an interactive Directed Acyclic Graph (DAG) for every scan executed by Mutagent.
+The **Security Investigations Console** renders an interactive Directed Acyclic Graph (DAG) for every scan executed by Mutagent — regardless of whether the scan originated from the Browser Extension or the PromptShield CLI (`psh`); both write to the same `investigations`/`agent_executions`/`timeline_events` tables via the same `InvestigationEngine`.
 
 ---
 
@@ -44,7 +44,7 @@ graph TD
 
 Each trace captures:
 - **Employee Attribution**: Full Name, Email, Department Badge.
-- **Target AI Platform**: `ChatGPT`, `Claude`, `Gemini`.
+- **Target AI Platform**: `ChatGPT`, `Claude`, `Gemini` (browser), or `Claude CLI`, `Gemini CLI` (terminal).
 - **Execution Summary**: Total Duration (ms), Score (0-100), Severity, Decision (`ALLOW`, `WARN`, `REDACT`, `BLOCK`).
 - **Evidence Panel**: Character offsets, confidence ratings, raw detector outputs, and match previews.
 - **Timeline**: Chronological event trail capturing start/finish events and duration per analyzer.

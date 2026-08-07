@@ -35,7 +35,7 @@ logger = logging.getLogger("promptshield.ai.file_scanner")
 # extraction itself.
 FILE_CATEGORIES: dict[str, str] = {
     # Documents
-    "pdf": "document", "txt": "document", "docx": "document",
+    "pdf": "document", "txt": "document", "docx": "document", "md": "document",
     # Source code
     "java": "source_code", "py": "source_code", "js": "source_code", "jsx": "source_code",
     "ts": "source_code", "tsx": "source_code", "cpp": "source_code", "cc": "source_code",
@@ -140,7 +140,7 @@ _PLAIN_TEXT_EXTENSIONS = {
     "java", "py", "js", "jsx", "ts", "tsx", "cpp", "cc", "cxx", "h", "hpp", "c", "cs",
     "go", "rs", "php", "html", "htm", "css", "sql",
     "env", "properties", "yaml", "yml", "json", "xml",
-    "log", "txt",
+    "log", "txt", "md",
 }
 
 EXTRACTORS: dict[str, Callable[[bytes], str]] = {

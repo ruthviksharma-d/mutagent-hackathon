@@ -26,8 +26,13 @@ class GeminiProvider(BaseCLIProvider):
             return 127
 
         cmd = [exe_path]
+        has_skip_trust = extra_args and "--skip-trust" in extra_args
+        if not has_skip_trust:
+            cmd.append("--skip-trust")
+
         if prompt:
-            cmd.append(prompt)
+            cmd.extend(["-p", prompt])
+
         if extra_args:
             cmd.extend(extra_args)
 

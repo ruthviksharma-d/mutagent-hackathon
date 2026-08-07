@@ -1,0 +1,210 @@
+{
+  "name": "promptshield-vscode",
+  "displayName": "PromptShield",
+  "description": "AI Firewall for VS Code / Antigravity: scan prompts, code selections, and files for sensitive data before you send them to an AI chat, enforced by the PromptShield backend policy engine.",
+  "version": "0.1.0",
+  "publisher": "promptshield",
+  "private": true,
+  "license": "UNLICENSED",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Linters",
+    "Chat"
+  ],
+  "keywords": [
+    "security",
+    "dlp",
+    "ai",
+    "copilot",
+    "prompt",
+    "firewall"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "promptshield.guardian",
+        "fullName": "PromptShield",
+        "name": "promptshield",
+        "description": "Scan a prompt against your organization's PromptShield policies before you send it elsewhere.",
+        "isSticky": true
+      }
+    ],
+    "commands": [
+      {
+        "command": "promptshield.login",
+        "title": "PromptShield: Sign In"
+      },
+      {
+        "command": "promptshield.logout",
+        "title": "PromptShield: Sign Out"
+      },
+      {
+        "command": "promptshield.scanSelection",
+        "title": "PromptShield: Scan Selected Text"
+      },
+      {
+        "command": "promptshield.scanClipboardPrompt",
+        "title": "PromptShield: Scan Clipboard Text"
+      },
+      {
+        "command": "promptshield.interceptAndSend",
+        "title": "PromptShield: Scan & Copy Approved Text to Clipboard"
+      },
+      {
+        "command": "promptshield.scanActiveFile",
+        "title": "PromptShield: Scan Active File"
+      },
+      {
+        "command": "promptshield.scanWorkspace",
+        "title": "PromptShield: Scan Workspace Files"
+      },
+      {
+        "command": "promptshield.showRiskPanel",
+        "title": "PromptShield: Show Risk Summary Panel"
+      },
+      {
+        "command": "promptshield.showOutputChannel",
+        "title": "PromptShield: Show Logs"
+      },
+      {
+        "command": "promptshield.clearScanHistory",
+        "title": "PromptShield: Clear Scan History"
+      },
+      {
+        "command": "promptshield.syncPolicies",
+        "title": "PromptShield: Sync Policies Now"
+      },
+      {
+        "command": "promptshield.refreshTreeView",
+        "title": "PromptShield: Refresh Findings View"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "promptshield.scanSelection",
+          "group": "promptshield",
+          "when": "editorHasSelection"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "promptshield.refreshTreeView",
+          "when": "false"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "promptshield",
+          "title": "PromptShield",
+          "icon": "media/activity-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "promptshield": [
+        {
+          "id": "promptshield.scanHistory",
+          "name": "Recent Scans & Findings"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "PromptShield",
+      "properties": {
+        "promptshield.backendUrl": {
+          "type": "string",
+          "default": "http://localhost:8000",
+          "description": "Base URL of the PromptShield backend (same backend used by the browser extension and CLI)."
+        },
+        "promptshield.organizationId": {
+          "type": "string",
+          "default": "",
+          "description": "Optional organization identifier sent with requests for multi-tenant deployments."
+        },
+        "promptshield.enableWorkspaceScan": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically scan files as they are opened/saved in the workspace and surface findings in the Problems panel."
+        },
+        "promptshield.enableFileScan": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow scanning of attached/selected files (via commands or chat participant) for sensitive content."
+        },
+        "promptshield.enablePromptScan": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable prompt scanning via the @promptshield chat participant and scan commands."
+        },
+        "promptshield.enableConversationContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include prior chat participant turns (conversation history) as context when scanning a prompt."
+        },
+        "promptshield.maxFileSizeKb": {
+          "type": "number",
+          "default": 2048,
+          "description": "Maximum file size (KB) that will be read and scanned. Larger files are skipped with a warning."
+        },
+        "promptshield.autoRedaction": {
+          "type": "boolean",
+          "default": true,
+          "description": "When the backend decision is REDACT, automatically use the sanitized text instead of prompting the user each time."
+        },
+        "promptshield.strictMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "When enabled, WARN decisions cannot be bypassed by the user - only ALLOW/REDACT results may proceed."
+        },
+        "promptshield.telemetry": {
+          "type": "boolean",
+          "default": false,
+          "description": "Persist raw prompt text in local scan history (globalState) for your own reference. Off by default - only metadata (decision, risk, timestamp, site) is stored otherwise."
+        },
+        "promptshield.debugMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Verbose logging in the PromptShield Output Channel (still sanitized - secrets/PII are redacted before being logged)."
+        },
+        "promptshield.failureMode": {
+          "type": "string",
+          "enum": [
+            "open",
+            "closed"
+          ],
+          "default": "open",
+          "description": "What to do when the backend is unreachable: 'open' allows the action through with a warning banner, 'closed' blocks it."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./ --noEmit && node esbuild.js",
+    "watch": "node esbuild.js --watch",
+    "package": "npm run compile && npx @vscode/vsce package",
+    "typecheck": "tsc -p ./ --noEmit",
+    "lint": "tsc -p ./ --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.8",
+    "exceljs": "^4.4.0",
+    "mammoth": "^1.7.0",
+    "pdf-parse": "^1.1.1"
+  }
+}

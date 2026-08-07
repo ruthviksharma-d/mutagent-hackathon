@@ -24,6 +24,7 @@ from routers import employees as employees_router
 from routers import settings as settings_router
 from routers import investigations as investigations_router
 from routers import cli as cli_router
+from routers import vscode as vscode_router
 
 # Import models so they're registered on Base.metadata before create_all()
 import models  # noqa: F401
@@ -88,6 +89,10 @@ app.include_router(employees_router.router)
 app.include_router(settings_router.router)
 app.include_router(investigations_router.router)
 app.include_router(cli_router.router)
+# Additive-only: read-only policy summary for the VS Code/Antigravity
+# extension client (submissions/velocity/vscode-extension). See
+# routers/vscode.py for why this is separate from routers/policies.py.
+app.include_router(vscode_router.router)
 
 
 @app.get("/")

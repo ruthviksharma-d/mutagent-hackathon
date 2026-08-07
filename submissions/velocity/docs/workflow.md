@@ -1,6 +1,6 @@
 # Multi-Agent Workflow — Mutagent Detection Engine
 
-The **Mutagent Multi-Agent Detection Engine** organizes security scanning into an isolated, fault-tolerant 5-stage Directed Acyclic Graph (DAG).
+The **Mutagent Multi-Agent Detection Engine** organizes security scanning into an isolated, fault-tolerant 5-stage Directed Acyclic Graph (DAG). This exact workflow runs identically whether the request originates from the Browser Extension (`POST /api/scan`) or the PromptShield CLI (`POST /api/cli/scan`) — both routers call the same `InvestigationEngine`, so there is no separate scanning logic for terminal usage.
 
 ---
 
@@ -9,8 +9,8 @@ The **Mutagent Multi-Agent Detection Engine** organizes security scanning into a
 ```mermaid
 sequenceDiagram
     autonumber
-    actor Client as Browser Extension
-    participant API as FastAPI Gateway
+    actor Client as Browser Extension / psh CLI
+    participant API as FastAPI Gateway (/api/scan or /api/cli/scan)
     participant Orchestrator as Mutagent Orchestrator
     participant Stage1 as Stage 1: ContextAgent
     participant Stage2 as Stage 2: FileIntelAgent
@@ -46,6 +46,20 @@ sequenceDiagram
     Orchestrator-->>API: Return ScanResponse
     API-->>Client: Return Verdict + Explainable AI Evidence
 ```
+
+---
+
+## Stage Descriptions
+
+1. **Stage 1 (Context)**: `ContextAgent` parses identity headers, user account attributes, and target AI domain.
+2. **Stage 2 (File Intelligence)**: `FileIntelAgent` inspects file mime-types, checks file extension policies, and decodes binary/text content (`.pdf`, `.docx`, `.xlsx`, `.csv`, `.py`, `.js`, image OCR).
+3. **Stage 3 (Parallel ThreadPool)**: Four specialized analyzers execute concurrently:
+   - **`PiiAgent`**: Microsoft Presidio + spaCy NER.
+   - **`SecretsAgent`**: `detect-secrets` 24 credential rules.
+   - **`InjectionAgent`**: Jailbreak and prompt override pattern matcher.
+   - **`ComplianceAgent`**: Company keyword list matcher.
+4. **Stage 4 (Risk Fusion)**: `RiskFusionAgent` applies org risk multipliers (`risk_weights`) to construct a unified 0–100 risk score.
+5. **Stage 5 (Decision Gate)**: `DecisionAgent` evaluates rules in priority order to return the final verdict.
 
 ---
 

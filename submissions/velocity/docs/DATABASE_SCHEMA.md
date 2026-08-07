@@ -1,12 +1,19 @@
 # Database Schema
 
-PromptShield AI uses MySQL 8.4 with five tables, all defined as SQLAlchemy
+PromptShield AI uses MySQL 8.4 with eight tables, all defined as SQLAlchemy
 2.0 models under `backend/models/` and created automatically via
 `Base.metadata.create_all()` on backend startup — there is no migration
 tool (Alembic is explicitly excluded per the project's constraints). All
 primary keys are UUID strings (`String(36)`) generated in Python via
 `uuid.uuid4()`, not auto-increment integers, so IDs are safe to expose in
 API responses and stable across environments.
+
+Five tables (`users`, `audit_logs`, `policies`, `company_keywords`,
+`org_settings`) were introduced in earlier milestones; three more
+(`investigations`, `agent_executions`, `timeline_events` — defined in
+`backend/models/investigation.py`) were added for the Mutagent multi-agent
+engine's richer investigation trace and are populated identically for
+scans from the Browser Extension and the PromptShield CLI.
 
 ## `users`
 
@@ -50,7 +57,7 @@ table row traces back to this table.
 |---|---|---|
 | `id` | `String(36)` PK | UUID |
 | `user_id` | `String(36)` FK → `users.id` | implicitly indexed by MySQL InnoDB as a foreign key |
-| `website` | `String(50)`, indexed | `ChatGPT` \| `Claude` \| `Gemini` |
+| `website` | `String(50)`, indexed | `ChatGPT` \| `Claude` \| `Gemini` (browser) or `Claude CLI` \| `Gemini CLI` (PromptShield CLI) |
 | `original_prompt` | `Text` | the prompt as typed |
 | `sanitized_prompt` | `Text` | equals `original_prompt` unless the decision was `REDACT`/`BLOCK` |
 | `risk` | `String(20)`, indexed | `NONE` \| `LOW` \| `MEDIUM` \| `HIGH` \| `CRITICAL` |
@@ -114,18 +121,94 @@ first read by `services/settings_service.get_or_create_settings()`.
 | `organization_name` | `String(200)` | default `Acme Corp` |
 | `risk_threshold` | `Integer` | default `70` — informational threshold surfaced on the Settings page |
 | `supported_websites` | `JSON` | default `["ChatGPT", "Claude", "Gemini"]` |
-| `allowed_file_types` | `JSON` | default `["pdf", "docx", "csv", "xlsx", "txt", "png", "jpg", "jpeg"]` |
+| `allowed_file_types` | `JSON` | default: the full extraction-capable set from `ai/file_scanner.py` — documents (`pdf`, `docx`, `txt`, `md`), source code (`java`, `py`, `js`, `jsx`, `ts`, `tsx`, `cpp`, `cc`, `cxx`, `h`, `hpp`, `c`, `cs`, `go`, `rs`, `php`, `html`, `htm`, `css`, `sql`), configuration (`env`, `properties`, `yaml`, `yml`, `json`, `xml`), data (`csv`, `xlsx`), logs (`log`), and images/OCR (`png`, `jpg`, `jpeg`) — 37 extensions in total. An admin can narrow this list from the Settings page at any time; anything removed is rejected before its content is extracted (`ai/file_risk.py::assess_disallowed_extension`). |
+| `risk_weights` | `JSON`, nullable | Mutagent: per-analyzer risk-fusion weight overrides, e.g. `{"SecretsAnalyzer": 1.0, "PiiAnalyzer": 0.6}`. `null` uses `mutagent/models.py::DEFAULT_RISK_WEIGHTS`. |
+| `enabled_analyzers` | `JSON`, nullable | Mutagent: list of analyzer class names to run, e.g. `["PiiAnalyzer", "SecretsAnalyzer"]`. `null`/empty means all analyzers enabled. |
 | `theme_default` | `String(10)` | default `light` — org-wide preference, independent of each browser's own per-device `ThemeContext` |
 | `updated_at` | `DateTime` | UTC |
+
+## `investigations`
+
+One row per scan, written by the Mutagent `InvestigationEngine`
+(`mutagent/trace.py::persist_trace`) for every scan from either client.
+`id` intentionally matches the `audit_logs.id` for the same scan, so the
+two tables can be cross-referenced without a JOIN.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `String(36)` PK | matches the corresponding `audit_logs.id` |
+| `user_id` | `String(36)` FK → `users.id`, indexed | |
+| `target_ai` | `String(100)` | `ChatGPT` \| `Claude` \| `Gemini` \| `Claude CLI` \| `Gemini CLI` |
+| `prompt_length` | `Integer` | |
+| `file_count` | `Integer` | |
+| `total_analyzers` | `Integer` | |
+| `analyzers_succeeded` / `analyzers_failed` / `analyzers_skipped` | `Integer` | per-status counts for the investigation |
+| `overall_score` | `Integer`, indexed | 0-100, from `RiskFusionAnalyzer` |
+| `overall_severity` | `String(20)`, indexed | `NONE` \| `LOW` \| `MEDIUM` \| `HIGH` \| `CRITICAL` |
+| `decision` | `String(20)`, indexed | `ALLOW` \| `WARN` \| `REDACT` \| `BLOCK` |
+| `total_execution_ms` | `Float` | full investigation wall-clock time |
+| `summary` | `JSON` | structured investigation summary rendered by the Investigation Detail page |
+| `created_at` | `DateTime`, indexed | UTC |
+
+## `agent_executions`
+
+One row per analyzer per investigation — the raw material for the
+Investigation Detail page's DAG node statuses and Evidence Panel. No
+separate `Finding` table; findings/evidence are stored as JSON here.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `String(36)` PK | UUID |
+| `investigation_id` | `String(36)` FK → `investigations.id`, indexed | |
+| `agent_name` | `String(100)`, indexed | e.g. `SecretsAnalyzer` |
+| `display_name` | `String(100)` | e.g. `Secrets Agent` |
+| `status` | `String(20)` | `PENDING` \| `RUNNING` \| `SUCCESS` \| `FAILED` \| `SKIPPED` \| `TIMEOUT` |
+| `execution_time_ms` | `Float` | |
+| `confidence` | `Float` | 0.0-1.0 |
+| `severity` | `String(20)` | |
+| `recommendation` | `String(20)` | |
+| `summary` | `Text` | one-sentence human-readable summary |
+| `error` | `Text`, nullable | populated on `FAILED` |
+| `findings` | `JSON` | list of `{detector, severity, score, reason, matches}` |
+| `evidence` | `JSON` | list of structured `Evidence` objects (label, value_preview, confidence, location, detector, severity, offsets, metadata) |
+| `created_at` | `DateTime` | UTC |
+
+## `timeline_events`
+
+A rich, timestamped event log per investigation — richer than just
+started/finished, so the Investigation Detail page's timeline can show
+skipped, timed-out, and recovered analyzers too.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `String(36)` PK | UUID |
+| `investigation_id` | `String(36)` FK → `investigations.id`, indexed | |
+| `event_type` | `String(50)`, indexed | `investigation_start` \| `investigation_end` \| `analyzer_started` \| `analyzer_finished` \| `analyzer_failed` \| `analyzer_skipped` \| `analyzer_timeout` \| `analyzer_recovered` \| `decision_made` |
+| `analyzer_name` | `String(100)`, nullable | |
+| `message` | `Text` | |
+| `timestamp` | `DateTime` | UTC |
+| `duration_ms` | `Float`, nullable | |
+| `event_metadata` | `JSON` | |
 
 ## Entity Relationships
 
 ```
-users (1) ───< audit_logs (many)      one employee generates many scan records
-policies                              standalone — referenced by name in audit_logs.reason, not FK'd
-company_keywords                      standalone — read by the Company Keyword Detector
-org_settings                          singleton — no relationships
+users (1) ───< audit_logs (many)          one employee generates many scan records
+users (1) ───< investigations (many)      one employee conducts many investigations
+investigations (1) ───< agent_executions (many)   one row per analyzer per investigation
+investigations (1) ───< timeline_events (many)    one investigation emits many timeline events
+policies                                  standalone — referenced by name in audit_logs.reason, not FK'd
+company_keywords                          standalone — read by the Company Keyword Detector
+org_settings                              singleton — no relationships
 ```
+
+`investigations.id` equals the `audit_logs.id` for the same scan (both
+written from the same request, whether it came from `/api/scan` or
+`/api/cli/scan`) — there is no foreign key between them, since they're
+written as two independent inserts in the same request rather than one
+referencing the other, but the shared UUID lets the dashboard join them
+in application code when it needs both the legacy audit fields and the
+richer Mutagent trace.
 
 There is intentionally no foreign key from `audit_logs` to `policies`:
 the policy that fired (if any) is recorded as free text inside `reason`

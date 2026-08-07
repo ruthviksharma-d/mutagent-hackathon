@@ -100,8 +100,10 @@ the initial pilot department.
 
 ## Roadmap
 
-- **Now (hackathon MVP)**: ChatGPT/Claude/Gemini on Chrome, single-tenant
-  self-hosted deployment, full detection pipeline, admin dashboard.
+- **Now (hackathon MVP)**: ChatGPT/Claude/Gemini on Chrome, a CLI wrapper
+  (`psh`) protecting Claude CLI and Gemini CLI usage on the same backend
+  and policy engine, single-tenant self-hosted deployment, full detection
+  pipeline, admin dashboard.
 - **Next 3 months**: multi-tenant SaaS hosting option, refresh-token auth,
   Firefox/Edge builds.
 - **6 months**: Gmail/Outlook/Teams/Slack adapters (the same interception

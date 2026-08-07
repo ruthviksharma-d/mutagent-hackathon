@@ -72,6 +72,15 @@ exceeding these limits get a `422` with a Pydantic validation error.
   "sanitized_prompt": "string",
   "findings": [
     { "detector": "string", "severity": "string", "score": 0, "reason": "string" }
+  ],
+  "file_findings": [
+    {
+      "filename": "string", "extension": "string", "category": "string",
+      "size_bytes": 0, "mime_type": "string",
+      "risk": "NONE | LOW | MEDIUM | HIGH | CRITICAL", "score": 0,
+      "action": "ALLOW | WARN | REDACT | BLOCK", "reason": "string",
+      "extracted": true, "extraction_note": null
+    }
   ]
 }
 ```
@@ -79,7 +88,48 @@ exceeding these limits get a `422` with a Pydantic validation error.
 This is the one contract every other part of the system is built around —
 `findings`/`reason` drive the extension's Explainable AI panel, and the
 whole response (plus the identity of the caller) is what gets written to
-`audit_logs`.
+`audit_logs`. `file_findings` carries each attached file's *own*
+independent decision — separate from the top-level `decision`, which
+governs the prompt+files as a whole — so a client can gate an individual
+risky attachment without failing the entire batch.
+
+## CLI Scan — `/api/cli`
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/cli/scan` | Bearer (optional) | Runs the identical detection pipeline as `/api/scan`, for the PromptShield CLI (`psh`). |
+
+Isolated from `/api/scan` at the router level (`routers/cli.py`) so
+browser-extension behavior can never be affected by CLI changes, but both
+routers call the same `ai.pipeline.run_pipeline_for_user()` →
+`mutagent.engine.InvestigationEngine` — no detection logic is duplicated.
+
+**Request/Response**: identical `ScanRequest`/`ScanResponse` shapes to
+`/api/scan` above, except `site` is conventionally `"Claude CLI"` or
+`"Gemini CLI"` (any string is accepted; the CLI sends the provider's
+display name).
+
+Unlike `/api/scan`, the `Authorization` header is optional: if omitted (or
+invalid/expired), the endpoint resolves the organization's default admin
+user, or failing that the first active user, so a single-user local `psh`
+setup works without a login step. If provided, a valid Bearer JWT is used
+exactly as it is for the browser extension, and the scan is attributed to
+that specific employee — which is what the Admin Dashboard needs to show
+correct employee attribution for CLI-originated investigations.
+
+## Investigations — `/api/investigations`
+
+Read-only endpoints powering the Security Investigations Console (DAG,
+risk gauge, evidence panel, timeline). Covers scans from both the Browser
+Extension and the PromptShield CLI, since both write to the same
+`investigations`/`agent_executions`/`timeline_events` tables.
+
+| Method | Path | Role | Description |
+|---|---|---|---|
+| `GET` | `/api/investigations` | analyst/admin | Paginated list. Query params: `page`, `page_size`, `decision`, `severity`. |
+| `GET` | `/api/investigations/{scan_id}` | analyst/admin | Full trace: investigation summary + every `agent_executions` row + full `timeline_events` list. |
+| `GET` | `/api/investigations/{scan_id}/timeline` | analyst/admin | Timeline events only, for a lighter payload. |
+| `GET` | `/api/investigations/{scan_id}/agents` | analyst/admin | Per-analyzer results + structured evidence only. |
 
 ## Dashboard — `/api/dashboard`
 

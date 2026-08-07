@@ -27,7 +27,7 @@ erDiagram
     investigations {
         string id PK
         string user_id FK
-        string target_ai "ChatGPT | Claude | Gemini"
+        string target_ai "ChatGPT | Claude | Gemini | Claude CLI | Gemini CLI"
         int prompt_length
         int file_count
         int total_analyzers
@@ -87,7 +87,7 @@ erDiagram
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Submitted: Extension Intercepts Event
+    [*] --> Submitted: Extension or psh CLI Intercepts Event
     Submitted --> ContextExtracted: Stage 1 (ContextAgent)
     ContextExtracted --> FilesInspected: Stage 2 (FileIntelAgent)
     
@@ -118,6 +118,17 @@ stateDiagram-v2
     
     TraceRecorded --> [*]: Rendered on Security Console
 ```
+
+---
+
+## Security Guarantees & Privacy Controls
+
+1. **Client-Side Interception**: Prompts and file attachments are intercepted locally before any HTTP request is dispatched to OpenAI, Anthropic, or Google servers — in the browser via DOM interception (extension), or on the local machine before the real `claude`/`gemini` CLI binary is ever launched (PromptShield CLI, `psh`).
+2. **Metadata-Only MySQL Storage**: Prompt texts are previewed or masked in audit logs; raw uploaded file binaries are never stored in MySQL, whether the upload came from the extension or a `psh -f` attachment.
+3. **Role-Based Access Control (RBAC)**:
+   - `admin`: Full configuration access (policy authoring, keyword management, user management).
+   - `security_analyst`: Read-only access to audit logs, analytics, and investigation traces.
+   - `employee`: Standard user access for Chrome extension authentication and CLI Bearer-token authentication (`POST /api/cli/scan` accepts an `Authorization: Bearer <jwt>` header; if omitted, the endpoint resolves the org's default admin/active user for local single-user CLI usage).
 
 ---
 

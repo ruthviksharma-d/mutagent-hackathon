@@ -250,12 +250,22 @@ class InvestigationContext:
 # Default risk weights
 # ---------------------------------------------------------------------------
 
+# FileIntelAnalyzer is weighted 1.0 (not dampened) because its CRITICAL-tier
+# identity findings (ai/file_risk.py - e.g. a bare .env or id_rsa upload,
+# score=80) are deliberately scored high enough to cross the Risk Engine's
+# CRITICAL threshold (>=75) "on their own, with no other detector needing to
+# corroborate them" (see ai/file_risk.py's module docstring - a bare .env
+# upload is documented to BLOCK by default even with empty/unreadable
+# content). Any weight below ~0.94 here silently drags that score under the
+# CRITICAL cutoff, downgrading the decision to REDACT and contradicting that
+# documented behavior - not a detection gap, just a fusion weight that has
+# to stay 1.0 for identity-risk scores tuned assuming no dilution.
 DEFAULT_RISK_WEIGHTS: dict[str, float] = {
     "PiiAnalyzer":        0.6,
     "SecretsAnalyzer":    1.0,
     "InjectionAnalyzer":  1.0,
     "ComplianceAnalyzer": 0.8,
-    "FileIntelAnalyzer":  0.7,
+    "FileIntelAnalyzer":  1.0,
 }
 
 DEFAULT_ANALYZER_TIMEOUT_SECONDS: float = 2.0

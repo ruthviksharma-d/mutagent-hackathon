@@ -9,8 +9,11 @@ in OrgSettings and tunable by admins from the dashboard.
 Default weights (if not configured):
     SecretsAnalyzer:    1.0  (highest — live credentials are critical)
     InjectionAnalyzer:  1.0  (jailbreaks / injections are critical)
+    FileIntelAnalyzer:  1.0  (identity risk, e.g. a bare .env/id_rsa upload,
+                              is scored to cross the CRITICAL threshold on
+                              its own - see mutagent/models.py - so it is
+                              intentionally NOT dampened)
     ComplianceAnalyzer: 0.8  (policy violations are severe)
-    FileIntelAnalyzer:  0.7  (identity risk matters)
     PiiAnalyzer:        0.6  (important but slightly lower default weight)
 
 Admins can tune these from Settings → Risk Weights.
